@@ -11,3 +11,12 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+
+
+def get_db():
+    """Yield a SQLAlchemy session for FastAPI dependencies."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from .db import init_db
+from .api import router as api_router
 
 app = FastAPI(title="Dead Hours Dashboard API")
 
@@ -7,6 +8,9 @@ app = FastAPI(title="Dead Hours Dashboard API")
 @app.on_event("startup")
 async def on_startup():
     init_db()
+
+
+app.include_router(api_router, prefix="/api")
 
 
 @app.get("/")
