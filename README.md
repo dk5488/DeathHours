@@ -35,22 +35,30 @@ This repo will gradually grow as features are implemented over the planned 8‑w
 
 ## Getting Started
 
-1. **Frontend**
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-2. **Backend**
-   ```bash
-   cd backend
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   uvicorn main:app --reload
-   ```
+### Prerequisites
+- Node.js 18+ for the frontend
+- Python 3.11+ for the backend
+- A Supabase account and database (see [backend/SUPABASE_SETUP.md](./backend/SUPABASE_SETUP.md))
 
-Environment variables should be defined in `backend/.env` (see `.env.example`).
+### 1. Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Frontend runs on `http://localhost:3000`
 
-Local development can proceed with the frontend hitting the backend at `http://localhost:8000` and the backend connecting to a local Postgres or Supabase instance.
+### 2. Backend
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your Supabase DATABASE_URL
+uvicorn main:app --reload
+```
+Backend API runs on `http://localhost:8000`
+
+**Important:** See [backend/SUPABASE_SETUP.md](./backend/SUPABASE_SETUP.md) for Supabase database connection instructions.
 
