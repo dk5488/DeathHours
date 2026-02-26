@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, EmailStr
 from typing import Optional, List, Any
 from datetime import datetime
 
@@ -7,6 +7,21 @@ class BusinessCreate(BaseModel):
     google_maps_url: HttpUrl
     name: Optional[str]
     category: Optional[str]
+
+
+# --- user auth ---
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    email: EmailStr
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
 
 class BusinessOut(BaseModel):
     id: int
@@ -34,6 +49,16 @@ class EventIn(BaseModel):
     distance_meters: float
     impact_score: float
     raw_data: Any
+
+
+# --- token models ---
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    user_id: Optional[int] = None
 
 class EventOut(EventIn):
     id: int
