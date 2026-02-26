@@ -11,22 +11,31 @@ Python-based API using FastAPI. This service handles all business logic, data in
 
 ## Setup
 
-Create a virtual environment and install dependencies:
+1. Create a virtual environment and install dependencies:
 
 ```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate
-pip install fastapi uvicorn
+pip install -r requirements.txt
 ```
 
-Add other packages such as `httpx`, `celery`, `stripe`, etc. as needed.
+2. Set up your Supabase connection. See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed instructions.
 
-Run the server locally:
+3. Copy `.env.example` to `.env` and fill in your Supabase `DATABASE_URL`:
+
+```bash
+cp .env.example .env
+# Edit .env with your DATABASE_URL
+```
+
+4. Run the server locally:
 
 ```bash
 uvicorn main:app --reload
 ```
+
+The database schema will be automatically initialized on startup.
 
 ## Structure
 
