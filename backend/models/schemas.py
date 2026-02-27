@@ -82,26 +82,34 @@ class AlertOut(AlertCreate):
         orm_mode = True
 
 # --- action card ---
-class ActionCardOut(BaseModel):
-    id: int
-    generated_at: datetime
+class ActionCardCreate(BaseModel):
     time_window_start: datetime
     time_window_end: datetime
     severity: str
     headline: str
     copy_text: str
+
+class ActionCardOut(ActionCardCreate):
+    id: int
+    generated_at: datetime
     completed: bool
 
     class Config:
         orm_mode = True
 
+
+class ActionCardUpdate(BaseModel):
+    completed: bool
+
 # --- report ---
-class ReportOut(BaseModel):
-    id: int
-    generated_at: datetime
+class ReportCreate(BaseModel):
     week_start: datetime
     week_end: datetime
     pdf_url: Optional[HttpUrl]
+
+class ReportOut(ReportCreate):
+    id: int
+    generated_at: datetime
 
     class Config:
         orm_mode = True
