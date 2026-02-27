@@ -117,3 +117,56 @@ def ingest_traffic(
     session.commit()
     session.refresh(tr)
     return tr
+
+
+# --- event endpoints ---
+@router.post("/businesses/{business_id}/events", response_model=schemas.EventOut, status_code=status.HTTP_201_CREATED)
+def create_event(
+    business_id: int,
+    event_in: schemas.EventIn,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    # verify business belongs to user
+    b = (
+        session.query(models.Business)
+        .filter(models.Business.id == business_id, models.Business.owner_id == current_user.id)
+        .first()
+    )
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    ev = models.Event(
+        business_id=business_id,
+        name=event_in.name,
+        start_time=event_in.start_time,
+        end_time=event_in.end_time,
+        distance_meters=event_in.distance_meters,
+        impact_score=event_in.impact_score,
+        raw_data=event_in.raw_data,
+    )
+    session.add(ev)
+    session.commit()
+    session.refresh(ev)
+    return ev
+
+
+@router.get("/businesses/{business_id}/events", response_model=List[schemas.EventOut])
+def list_events(
+    business_id: int,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    # ensure business exists and belongs to user
+    b = (
+        session.query(models.Business)
+        .filter(models.Business.id == business_id, models.Business.owner_id == current_user.id)
+        .first()
+    )
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return (
+        session.query(models.Event)
+        .filter(models.Event.business_id == business_id)
+        .order_by(models.Event.start_time)
+        .all()
+    )
