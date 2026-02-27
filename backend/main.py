@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from .db import init_db
-from .api import router as api_router
+from .config.db import init_db
+from .controllers.api import router as api_router
 
 app = FastAPI(title="Dead Hours Dashboard API")
 
