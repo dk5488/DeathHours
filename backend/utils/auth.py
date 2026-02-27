@@ -4,11 +4,12 @@ from typing import Optional
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from ..models import models
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
-from . import models, db
+from ..config import db
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-now")
 ALGORITHM = "HS256"
