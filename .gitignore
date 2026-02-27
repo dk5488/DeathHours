@@ -10,6 +10,6 @@ __pycache__/
 # IDEs
 .vscode/
 
-.env.*
+backend/.env.example
 
 context.txt
