@@ -13,3 +13,4 @@ __pycache__/
 backend/.env.example
 
 context.txt
+NEXT_STEPS.txt

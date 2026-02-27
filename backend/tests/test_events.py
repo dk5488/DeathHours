@@ -1,34 +1,11 @@
-from fastapi.testclient import TestClient
-import os
-import sys
 from datetime import datetime, timedelta
 
-# ensure project root is on path so imports work
-# test module location: backend/tests, so parent parent is workspace root
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+# client fixture is provided by conftest
 
-from backend.main import app
-from backend.config.db import init_db
 from backend.models import models, schemas
-from backend.config import db as db_module
-
-client = TestClient(app)
 
 
-def setup_module(module):
-    # ensure clean database
-    # remove any existing sqlite file if present
-    url = os.getenv("DATABASE_URL", "sqlite:///./test.db")
-    if url.startswith("sqlite"):
-        path = url.split("///")[-1]
-        try:
-            os.remove(path)
-        except Exception:
-            pass
-    init_db()
-
-
-def create_user_and_business():
+def create_user_and_business(client):
     # create a user
     resp = client.post(
         "/api/users",
@@ -53,8 +30,8 @@ def create_user_and_business():
     return headers, business["id"]
 
 
-def test_event_workflow():
-    headers, business_id = create_user_and_business()
+def test_event_workflow(client):
+    headers, business_id = create_user_and_business(client)
     # create event
     now = datetime.utcnow()
     event_payload = {
