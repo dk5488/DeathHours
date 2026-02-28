@@ -22,6 +22,7 @@ class Business(Base):
     category = Column(String)
     address = Column(String)
     timezone = Column(String)
+    busy_hours = Column(JSON, default={})  # stores weekly busy hour arrays keyed by weekday
     created_at = Column(DateTime)
 
     owner = relationship("User", back_populates="businesses")
