@@ -95,6 +95,19 @@ class ActionCardOut(BaseModel):
     class Config:
         orm_mode = True
 
+
+# --- action card create/update
+class ActionCardCreate(BaseModel):
+    time_window_start: datetime
+    time_window_end: datetime
+    severity: str
+    headline: str
+    copy_text: str
+
+
+class ActionCardUpdate(BaseModel):
+    completed: bool
+
 # --- report ---
 class ReportOut(BaseModel):
     id: int
@@ -105,6 +118,13 @@ class ReportOut(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+# --- report create
+class ReportCreate(BaseModel):
+    week_start: datetime
+    week_end: datetime
+    pdf_url: Optional[HttpUrl]
 
 # --- competitor ---
 class CompetitorCreate(BaseModel):
