@@ -8,23 +8,26 @@ from typing import List
 from datetime import datetime
 
 from ..config import db
+from ..service import (
+    UserService,
+    BusinessService,
+    TrafficReadingService,
+    EventService,
+    AlertService,
+    ActionCardService,
+    ReportService,
+    CompetitorService,
+)
 
 router = APIRouter()
 
 # --- authentication helpers ---
 @router.post("/users", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
 def create_user(user_in: schemas.UserCreate, session: Session = Depends(db.get_db)):
-    existing = session.query(models.User).filter(models.User.email == user_in.email).first()
-    if existing:
+    hashed_password = auth.get_password_hash(user_in.password)
+    u = UserService.register_user(session, user_in.email, hashed_password)
+    if u is None:
         raise HTTPException(status_code=400, detail="Email already registered")
-    u = models.User(
-        email=user_in.email,
-        hashed_password=auth.get_password_hash(user_in.password),
-        created_at=datetime.utcnow(),
-    )
-    session.add(u)
-    session.commit()
-    session.refresh(u)
     return u
 
 
@@ -50,16 +53,15 @@ def create_business(
     session: Session = Depends(db.get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    b = models.Business(
-        owner_id=current_user.id,
-        google_maps_url=str(business.google_maps_url),
-        name=business.name,
-        category=business.category,
-        created_at=datetime.utcnow(),
+    b = BusinessService.create_business(
+        session,
+        current_user.id,
+        str(business.google_maps_url),
+        business.name,
+        business.category,
     )
-    session.add(b)
-    session.commit()
-    session.refresh(b)
+    if b is None:
+        raise HTTPException(status_code=400, detail="Business URL already exists")
     return b
 
 
@@ -68,11 +70,7 @@ def list_businesses(
     session: Session = Depends(db.get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    return (
-        session.query(models.Business)
-        .filter(models.Business.owner_id == current_user.id)
-        .all()
-    )
+    return BusinessService.get_user_businesses(session, current_user.id)
 
 
 @router.get("/businesses/{business_id}", response_model=schemas.BusinessOut)
@@ -81,11 +79,7 @@ def get_business(
     session: Session = Depends(db.get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    b = (
-        session.query(models.Business)
-        .filter(models.Business.id == business_id, models.Business.owner_id == current_user.id)
-        .first()
-    )
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
     return b
@@ -99,23 +93,17 @@ def ingest_traffic(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     # ensure business exists and belongs to user
-    b = (
-        session.query(models.Business)
-        .filter(models.Business.id == business_id, models.Business.owner_id == current_user.id)
-        .first()
-    )
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
 
-    tr = models.TrafficReading(
-        business_id=business_id,
-        timestamp=reading.timestamp,
-        visitors_estimate=reading.visitors_estimate,
-        source=reading.source,
+    tr = TrafficReadingService.create_traffic_reading(
+        session,
+        business_id,
+        reading.timestamp,
+        reading.visitors_estimate,
+        reading.source,
     )
-    session.add(tr)
-    session.commit()
-    session.refresh(tr)
     return tr
 
 
@@ -128,25 +116,19 @@ def create_event(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     # verify business belongs to user
-    b = (
-        session.query(models.Business)
-        .filter(models.Business.id == business_id, models.Business.owner_id == current_user.id)
-        .first()
-    )
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
-    ev = models.Event(
-        business_id=business_id,
-        name=event_in.name,
-        start_time=event_in.start_time,
-        end_time=event_in.end_time,
-        distance_meters=event_in.distance_meters,
-        impact_score=event_in.impact_score,
-        raw_data=event_in.raw_data,
+    ev = EventService.create_event(
+        session,
+        business_id,
+        event_in.name,
+        event_in.start_time,
+        event_in.end_time,
+        event_in.distance_meters,
+        event_in.impact_score,
+        event_in.raw_data,
     )
-    session.add(ev)
-    session.commit()
-    session.refresh(ev)
     return ev
 
 
@@ -157,16 +139,160 @@ def list_events(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     # ensure business exists and belongs to user
-    b = (
-        session.query(models.Business)
-        .filter(models.Business.id == business_id, models.Business.owner_id == current_user.id)
-        .first()
-    )
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
-    return (
-        session.query(models.Event)
-        .filter(models.Event.business_id == business_id)
-        .order_by(models.Event.start_time)
-        .all()
+    return EventService.get_business_events(session, business_id)
+
+
+# --- alert endpoints ---
+@router.post("/businesses/{business_id}/alerts", response_model=schemas.AlertOut, status_code=status.HTTP_201_CREATED)
+def create_alert(
+    business_id: int,
+    alert_in: schemas.AlertCreate,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    al = AlertService.create_alert(
+        session,
+        business_id,
+        alert_in.threshold_pct,
+        ",".join(alert_in.channels),
+        False,
     )
+    # pydantic schema expects channels list
+    al.channels = al.channels.split(",") if al.channels else []
+    return al
+
+
+@router.get("/businesses/{business_id}/alerts", response_model=List[schemas.AlertOut])
+def list_alerts(
+    business_id: int,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    alerts = AlertService.get_business_alerts(session, business_id)
+    # convert channels string back to list since schema expects list
+    for a in alerts:
+        a.channels = a.channels.split(",") if a.channels else []
+    return alerts
+
+
+# --- action card endpoints ---
+@router.post("/businesses/{business_id}/action_cards", response_model=schemas.ActionCardOut, status_code=status.HTTP_201_CREATED)
+def create_action_card(
+    business_id: int,
+    card_in: schemas.ActionCardCreate,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    card = ActionCardService.create_action_card(
+        session,
+        business_id,
+        card_in.time_window_start,
+        card_in.time_window_end,
+        card_in.severity,
+        card_in.headline,
+        card_in.copy_text,
+    )
+    return card
+
+
+@router.get("/businesses/{business_id}/action_cards", response_model=List[schemas.ActionCardOut])
+def list_action_cards(
+    business_id: int,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return ActionCardService.get_business_action_cards(session, business_id)
+
+
+@router.patch("/businesses/{business_id}/action_cards/{card_id}", response_model=schemas.ActionCardOut)
+def update_action_card(
+    business_id: int,
+    card_id: int,
+    update: schemas.ActionCardUpdate,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    card = ActionCardService.get_business_action_cards(session, business_id)
+    # find matching card
+    target = next((c for c in card if c.id == card_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Action card not found")
+    updated = ActionCardService.mark_action_card_complete(session, card_id) if update.completed else ActionCardService.mark_action_card_incomplete(session, card_id)
+    return updated
+
+
+# --- report endpoints ---
+@router.post("/businesses/{business_id}/reports", response_model=schemas.ReportOut, status_code=status.HTTP_201_CREATED)
+def create_report(
+    business_id: int,
+    report_in: schemas.ReportCreate,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    rep = ReportService.create_report(
+        session,
+        business_id,
+        report_in.week_start,
+        report_in.week_end,
+        report_in.pdf_url,
+    )
+    return rep
+
+
+@router.get("/businesses/{business_id}/reports", response_model=List[schemas.ReportOut])
+def list_reports(
+    business_id: int,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return ReportService.get_business_reports(session, business_id)
+
+
+# --- competitor endpoints ---
+@router.post("/businesses/{business_id}/competitors", response_model=schemas.CompetitorOut, status_code=status.HTTP_201_CREATED)
+def add_competitor(
+    business_id: int,
+    comp_in: schemas.CompetitorCreate,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    c = CompetitorService.add_competitor(
+        session, business_id, comp_in.name, str(comp_in.google_maps_url)
+    )
+    return c
+
+
+@router.get("/businesses/{business_id}/competitors", response_model=List[schemas.CompetitorOut])
+def list_competitors(
+    business_id: int,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return CompetitorService.get_business_competitors(session, business_id)

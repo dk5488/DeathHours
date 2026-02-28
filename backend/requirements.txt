@@ -9,3 +9,5 @@ stripe
 supabase
 passlib[bcrypt]
 python-jose[cryptography]
+
+google-genai

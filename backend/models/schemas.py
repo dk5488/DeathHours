@@ -114,6 +114,7 @@ class ReportOut(ReportCreate):
     class Config:
         orm_mode = True
 
+
 # --- competitor ---
 class CompetitorCreate(BaseModel):
     name: str
