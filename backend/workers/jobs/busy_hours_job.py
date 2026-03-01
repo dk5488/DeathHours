@@ -1,4 +1,6 @@
 import logging
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from backend.utils.bussiness_traffic_utils import _calculate_hour_frequency, process_and_store_busy_hours_pattern
 from backend.workers.celery_app import celery_app
@@ -107,18 +109,35 @@ def _store_traffic_readings(session, business_id: int, hour_data: dict) -> None:
     hour_frequency = _calculate_hour_frequency(parsed_hour_data)
     logger.debug("hour_frequency for business_id=%s: %s", business_id, hour_frequency)
     
-    # Step 3: Store pattern data for all day/hour combinations
+    # Step 3: Store pattern data for all day/hour combinations using business timezone
+    business = BusinessRepository.get_business_by_id(session, business_id)
+    tz_name = (business.timezone or "UTC") if business is not None else "UTC"
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        logger.warning("invalid timezone %s for business %s, falling back to UTC", tz_name, business_id)
+        tz = ZoneInfo("UTC")
+
+    # Determine local week start (Monday) for synthetic timestamps
+    now_local = datetime.now(tz)
+    local_monday = (now_local - timedelta(days=now_local.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+
     for day_name, busy_hours in parsed_hour_data.items():
         day_of_week = day_name_to_dow.get(day_name.lower())
         if day_of_week is None:
             logger.warning("unknown day name: %s, skipping", day_name)
             continue
-        
+
         for hour in range(24):
             is_busy = hour in busy_hours
             # Use data-driven busyness score based on frequency across the week
             busyness_score = hour_frequency.get(hour, 0.0)
-            
+
+            # Construct a timezone-aware synthetic timestamp for this day/hour
+            local_dt = local_monday + timedelta(days=day_of_week, hours=hour)
+            # Convert to UTC for storage (database stores UTC-naive datetimes)
+            utc_dt = local_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
             TrafficReadingService.upsert_busy_hours_pattern(
                 session=session,
                 business_id=business_id,
@@ -126,6 +145,7 @@ def _store_traffic_readings(session, business_id: int, hour_data: dict) -> None:
                 hour=hour,
                 is_busy=is_busy,
                 busyness_score=busyness_score,
+                synthetic_timestamp=utc_dt,
             )
     
     logger.info("created/updated busy hour patterns for business_id=%s with frequency-based busyness scores (168 rows total)", business_id)

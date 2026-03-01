@@ -67,6 +67,7 @@ class TrafficReadingRepository:
         hour: int,
         is_busy: bool,
         busyness_score: float,
+        synthetic_timestamp: datetime | None = None,
     ) -> models.TrafficReading:
         """Upsert busy hours pattern data (for expected/typical hours).
         
@@ -103,10 +104,11 @@ class TrafficReadingRepository:
             session.refresh(existing)
             return existing
         
-        # Create synthetic timestamp for this pattern (e.g., next Monday for day 0)
-        # Use arbitrary date, timestamp is informational only for patterns
-        synthetic_timestamp = datetime(2024, 3, 4, hour=hour)  # Monday, March 4, 2024
-        
+        # Use provided synthetic timestamp if given, otherwise fall back to an
+        # arbitrary informational timestamp (no business timezone context).
+        if synthetic_timestamp is None:
+            synthetic_timestamp = datetime(2024, 3, 4, hour=hour)
+
         return TrafficReadingRepository.create_traffic_reading(
             session=session,
             business_id=business_id,

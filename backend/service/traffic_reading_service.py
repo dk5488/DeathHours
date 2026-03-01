@@ -51,6 +51,7 @@ class TrafficReadingService:
         hour: int,
         is_busy: bool,
         busyness_score: float,
+        synthetic_timestamp: datetime | None = None,
     ) -> models.TrafficReading:
         """Upsert busy hours pattern data.
         
@@ -66,7 +67,7 @@ class TrafficReadingService:
             Updated or created TrafficReading instance
         """
         return TrafficReadingRepository.upsert_busy_hours_pattern(
-            session, business_id, day_of_week, hour, is_busy, busyness_score
+            session, business_id, day_of_week, hour, is_busy, busyness_score, synthetic_timestamp
         )
 
     @staticmethod
