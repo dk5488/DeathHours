@@ -2,6 +2,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from ..models.models import Base
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+# Load .env from backend directory
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+load_dotenv(env_path)
 
 # ensure sqlite relative path resolves to an absolute file so that
 # the engine always points to the same location regardless of current working

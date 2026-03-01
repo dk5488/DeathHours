@@ -2,7 +2,16 @@ import json
 from google import genai
 from google.genai import types
 
-client = genai.Client()
+# lazily initialize client so importing this module does not require a valid
+# API key at import time (which prevented Celery from registering tasks).
+_genai_client = None
+
+def _get_genai_client():
+    global _genai_client
+    if _genai_client is None:
+        _genai_client = genai.Client()
+    return _genai_client
+
 
 def generate_hour_data_from_gemini(business_gmap_uri: str) -> dict:
     # 1. Define the Grounding Tool
@@ -25,10 +34,11 @@ Reference Data: Use the "Popular Times" historical average data.""",
 
     user_prompt = f"Extract busy hours for the business with Google Maps URI: {business_gmap_uri}"
 
+    client = _get_genai_client()
     response = client.models.generate_content(
-        model="gemini-2.0-flash", 
+        model="gemini-2.0-flash",
         contents=user_prompt,
-        config=config
+        config=config,
     )
-    
+
     return json.loads(response.text)
