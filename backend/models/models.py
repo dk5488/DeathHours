@@ -38,8 +38,12 @@ class TrafficReading(Base):
     id = Column(Integer, primary_key=True)
     business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False, index=True)
     timestamp = Column(DateTime, nullable=False, index=True)
-    visitors_estimate = Column(Integer)
-    source = Column(String)  # e.g. "outscraper"
+    busyness_score = Column(Float)  # 0-100 percentage, represents expected busyness
+    is_estimated = Column(Boolean, default=False)  # true if synthetic/expected, false if real data
+    source = Column(String)  # e.g. "gemini" (estimated), "outscraper" (real)
+    day_of_week = Column(Integer)  # 0=Monday...6=Sunday, derived from timestamp
+    hour = Column(Integer)  # 0-23, derived from timestamp
+    is_busy = Column(Boolean)  # true if this hour is typically busy for the business
 
     business = relationship("Business", back_populates="traffic_readings")
 
