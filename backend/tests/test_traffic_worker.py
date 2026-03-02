@@ -40,8 +40,8 @@ def test_fetch_and_store_for_business(headers_and_business):
         session.close()
 
 
-def test_store_pattern_only_current_day(headers_and_business):
-    """Ensure busy-hours pattern upsert only creates rows for today's day_of_week."""
+def test_store_pattern_only_current_and_next_day(headers_and_business):
+    """Ensure busy-hours pattern upsert creates rows for current day and next day only."""
     headers, business_id = headers_and_business
     # prepare session and clear any existing readings
     session = SessionLocal()
@@ -56,6 +56,7 @@ def test_store_pattern_only_current_day(headers_and_business):
         from datetime import datetime
         now_local = datetime.now(ZoneInfo(tz_name))
         current_dow = now_local.weekday()
+        next_dow = (current_dow + 1) % 7
 
         # supply hour_data with values for every day
         hour_data = {
@@ -85,8 +86,9 @@ def test_store_pattern_only_current_day(headers_and_business):
             )
 
         assert counts[current_dow] == 24, f"expected 24 rows for current dow {current_dow}, got {counts[current_dow]}"
+        assert counts[next_dow] == 24, f"expected 24 rows for next dow {next_dow}, got {counts[next_dow]}"
         for i in range(7):
-            if i != current_dow:
+            if i != current_dow and i != next_dow:
                 assert counts[i] == 0, f"unexpected rows for dow {i}: {counts[i]}"
     finally:
         session.close()

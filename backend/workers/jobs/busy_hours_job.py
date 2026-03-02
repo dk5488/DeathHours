@@ -122,42 +122,47 @@ def _store_traffic_readings(session, business_id: int, hour_data: dict) -> None:
     now_local = datetime.now(tz)
     local_monday = (now_local - timedelta(days=now_local.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     current_day_of_week = now_local.weekday()
+    next_day_of_week = (current_day_of_week + 1) % 7
 
     # Normalize parsed_hour_data keys to lowercase for lookup
     normalized_parsed = {k.lower(): set(v) for k, v in parsed_hour_data.items()}
 
-    # Map dow -> day name and pick the entry for the current local day
+    # Map dow -> day name
     dow_to_name = {v: k for k, v in day_name_to_dow.items()}
-    current_day_name = dow_to_name.get(current_day_of_week)
-    if current_day_name is None:
-        logger.warning("could not determine current day name for dow=%s, skipping pattern store", current_day_of_week)
-        return
 
-    busy_hours_for_today = normalized_parsed.get(current_day_name, set())
+    logger.debug("storing busy hour patterns for business_id=%s for current day (dow=%s) and next day (dow=%s)", 
+                 business_id, current_day_of_week, next_day_of_week)
 
-    logger.debug("storing busy hour pattern for business_id=%s for day=%s (dow=%s)", business_id, current_day_name, current_day_of_week)
+    # Store patterns for both current day and next day
+    for day_offset, day_of_week in [(0, current_day_of_week), (1, next_day_of_week)]:
+        day_name = dow_to_name.get(day_of_week)
+        if day_name is None:
+            logger.warning("could not determine day name for dow=%s, skipping pattern store", day_of_week)
+            continue
 
-    for hour in range(24):
-        is_busy = hour in busy_hours_for_today
-        # Use data-driven busyness score based on frequency across the week
-        busyness_score = hour_frequency.get(hour, 0.0)
+        busy_hours_for_day = normalized_parsed.get(day_name, set())
 
-        # Construct a timezone-aware synthetic timestamp for this day/hour
-        local_dt = local_monday + timedelta(days=current_day_of_week, hours=hour)
-        # Convert to UTC for storage (database stores UTC-naive datetimes)
-        utc_dt = local_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+        for hour in range(24):
+            is_busy = hour in busy_hours_for_day
+            # Use data-driven busyness score based on frequency across the week
+            busyness_score = hour_frequency.get(hour, 0.0)
 
-        TrafficReadingService.upsert_busy_hours_pattern(
-            session=session,
-            business_id=business_id,
-            day_of_week=current_day_of_week,
-            hour=hour,
-            is_busy=is_busy,
-            busyness_score=busyness_score,
-            synthetic_timestamp=utc_dt,
-        )
+            # Construct a timezone-aware synthetic timestamp for this day/hour
+            local_dt = local_monday + timedelta(days=day_of_week, hours=hour)
+            # Convert to UTC for storage (database stores UTC-naive datetimes)
+            utc_dt = local_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
+            TrafficReadingService.upsert_busy_hours_pattern(
+                session=session,
+                business_id=business_id,
+                day_of_week=day_of_week,
+                hour=hour,
+                is_busy=is_busy,
+                busyness_score=busyness_score,
+                synthetic_timestamp=utc_dt,
+            )
     
-    logger.info("created/updated busy hour patterns for business_id=%s with frequency-based busyness scores (168 rows total)", business_id)
+    logger.info("created/updated busy hour patterns for business_id=%s with frequency-based busyness scores (48 rows total for current and next day)", business_id)
 
 
 
