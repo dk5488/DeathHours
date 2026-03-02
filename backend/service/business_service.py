@@ -1,9 +1,13 @@
 """Service layer for Business business logic."""
 
+import logging
+
 from sqlalchemy.orm import Session
 from typing import List
 from ..repository import BusinessRepository
 from ..models import models
+
+logger = logging.getLogger(__name__)
 
 
 class BusinessService:
@@ -38,6 +42,29 @@ class BusinessService:
         return BusinessRepository.create_business(
             session, owner_id, google_maps_url, name, category, address, timezone
         )
+    
+    @staticmethod
+    def update_business_busy_hours(
+        session: Session,
+        owner_id: int,
+        business_id: int,
+        busy_hours: dict,
+    ) -> dict | None:
+        """Wrapper around repository call that enforces ownership and
+        returns a JSON-friendly result.
+
+        Returns ``None`` if the business was not found or not owned by the
+        specified user.
+        """
+        logger.debug("update_business_busy_hours called owner=%s business=%s", owner_id, business_id)
+        result = BusinessRepository.update_busy_hours(
+            session, owner_id, business_id, busy_hours
+        )
+        if result is None:
+            logger.warning("no business found for owner=%s id=%s during busy_hours update", owner_id, business_id)
+        else:
+            logger.info("busy_hours updated for business_id=%s", business_id)
+        return result
 
     @staticmethod
     def get_business_by_id_and_owner(
@@ -86,3 +113,14 @@ class BusinessService:
             session, business_id, owner_id
         )
         return business is not None
+
+    @staticmethod
+    def get_gmaps_uri_from_business(session: Session) -> List[models.Business]:
+        """Get the Google Maps URI for a business.
+        
+        Args:
+            session: SQLAlchemy session
+        """
+
+        return BusinessRepository.get_all_businesses(session)
+

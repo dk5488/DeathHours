@@ -15,6 +15,17 @@ class UserCreate(BaseModel):
     password: str
 
 
+# --- busy hours update ---
+class BusyHoursUpdate(BaseModel):
+    busy_hours: dict
+
+    class Config:
+        schema_extra = {
+            "example": {"busy_hours": {"monday": [1, 2, 3], "tuesday": []}}
+        }
+
+
+
 class UserOut(BaseModel):
     id: int
     email: EmailStr
@@ -28,6 +39,7 @@ class BusinessOut(BaseModel):
     google_maps_url: HttpUrl
     name: Optional[str]
     category: Optional[str]
+    busy_hours: Optional[dict] = None
 
     class Config:
         orm_mode = True

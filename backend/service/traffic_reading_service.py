@@ -15,8 +15,12 @@ class TrafficReadingService:
         session: Session,
         business_id: int,
         timestamp: datetime,
-        visitors_estimate: int | None = None,
+        busyness_score: float | None = None,
         source: str | None = None,
+        is_estimated: bool = False,
+        day_of_week: int | None = None,
+        hour: int | None = None,
+        is_busy: bool | None = None,
     ) -> models.TrafficReading:
         """Create a new traffic reading.
         
@@ -24,14 +28,46 @@ class TrafficReadingService:
             session: SQLAlchemy session
             business_id: Business ID
             timestamp: Reading timestamp
-            visitors_estimate: Estimated number of visitors (optional)
-            source: Data source (optional)
+            busyness_score: Busyness percentage 0-100 (optional)
+            source: Data source (optional, e.g. "gemini", "outscraper")
+            is_estimated: True if synthetic/expected, False if real data (default False)
+            day_of_week: 0=Monday...6=Sunday (optional, derived if not provided)
+            hour: Hour of day 0-23 (optional, derived if not provided)
+            is_busy: True if this hour is typically busy (optional)
             
         Returns:
             Created TrafficReading instance
         """
         return TrafficReadingRepository.create_traffic_reading(
-            session, business_id, timestamp, visitors_estimate, source
+            session, business_id, timestamp, busyness_score, source, 
+            is_estimated, day_of_week, hour, is_busy
+        )
+
+    @staticmethod
+    def upsert_busy_hours_pattern(
+        session: Session,
+        business_id: int,
+        day_of_week: int,
+        hour: int,
+        is_busy: bool,
+        busyness_score: float,
+        synthetic_timestamp: datetime | None = None,
+    ) -> models.TrafficReading:
+        """Upsert busy hours pattern data.
+        
+        Args:
+            session: SQLAlchemy session
+            business_id: Business ID
+            day_of_week: 0=Monday...6=Sunday
+            hour: Hour of day 0-23
+            is_busy: True if this hour is typically busy
+            busyness_score: Expected busyness 0-100 (frequency-based)
+            
+        Returns:
+            Updated or created TrafficReading instance
+        """
+        return TrafficReadingRepository.upsert_busy_hours_pattern(
+            session, business_id, day_of_week, hour, is_busy, busyness_score, synthetic_timestamp
         )
 
     @staticmethod

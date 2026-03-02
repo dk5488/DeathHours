@@ -1,4 +1,8 @@
+import logging
+
 from ..models import models, schemas
+
+logger = logging.getLogger(__name__)
 
 from ..utils import auth
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -83,6 +87,28 @@ def get_business(
     if not b:
         raise HTTPException(status_code=404, detail="Business not found")
     return b
+
+
+@router.patch("/businesses/{business_id}/busy_hours", response_model=schemas.BusinessOut)
+def update_busy_hours(
+    business_id: int,
+    payload: schemas.BusyHoursUpdate,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    # verify ownership
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    updated = BusinessService.update_business_busy_hours(
+        session, current_user.id, business_id, payload.busy_hours
+    )
+    if updated is None:
+        # should never happen because we just checked existence, but keep safe
+        raise HTTPException(status_code=500, detail="Unable to update busy hours")
+    # return fresh object for Pydantic to serialize
+    # reload business from session to include new field
+    return BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
 
 
 @router.post("/businesses/{business_id}/traffic", response_model=schemas.TrafficReading)
@@ -234,6 +260,24 @@ def update_action_card(
         raise HTTPException(status_code=404, detail="Action card not found")
     updated = ActionCardService.mark_action_card_complete(session, card_id) if update.completed else ActionCardService.mark_action_card_incomplete(session, card_id)
     return updated
+
+# --- busy hours endpoints ---
+@router.patch("/businesses/{business_id}/busy_hours", response_model=schemas.BusinessOut)
+def update_busy_hours(
+    business_id: int,
+    payload: schemas.BusyHoursUpdate,
+    session: Session = Depends(db.get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    logger.info("patch busy_hours business=%s owner=%s payload=%s", business_id, current_user.id, payload.busy_hours)
+    b = BusinessService.get_business_by_id_and_owner(session, business_id, current_user.id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Business not found")
+    result = BusinessService.update_business_busy_hours(
+        session, current_user.id, business_id, payload.busy_hours
+    )
+    # BusinessService returns a raw dict which already contains busy_hours
+    return result
 
 
 # --- report endpoints ---
